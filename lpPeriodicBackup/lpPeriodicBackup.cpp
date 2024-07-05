@@ -8,6 +8,12 @@
 #include <QDebug>
 #include <QDir>
 #include "QtGui/QGuiApplication"
+#include <Windows.h>
+#include <Shobjidl.h>
+#include <Shlwapi.h>
+#include <iostream>
+
+#pragma comment(lib, "Shlwapi.lib")
 #pragma execution_character_set("utf-8")
 QSharedPointer<lpPeriodicBackupBase>lpCreatePeriodicBackup()
 {
@@ -19,6 +25,9 @@ lpPeriodicBackup::lpPeriodicBackup(QObject *parent)
 	loadConfig();
 	m_backupTimer = new QTimer(this);
 	connect(m_backupTimer, &QTimer::timeout, this, &lpPeriodicBackup::backupNow);
+	m_process = new QProcess(this);
+	connect(m_process, QOverload<int, QProcess::ExitStatus>::of(&QProcess::finished),
+		this, &lpPeriodicBackup::onProcessFinished);
 }
 
 lpPeriodicBackup::~lpPeriodicBackup()
@@ -51,11 +60,13 @@ void lpPeriodicBackup::backupNow()
 		{
 			qDebug() << "Backup and compression successful!! --zipFilePath:" << zipFilePath << __FUNCTION__;
 			// 删除临时备份文件夹
-			QDir(backupFolderPath).removeRecursively();
+			m_currentBackupFolderPath = backupFolderPath; // 保存当前备份文件夹路径
 		}
 		else
 		{
 			qDebug() << "Compression failed!! --backupFolderPath:" << backupFolderPath << __FUNCTION__;
+			// 如果压缩失败，可以选择删除临时备份文件夹
+			QDir(backupFolderPath).removeRecursively();
 		}
 	}
 	else
@@ -65,10 +76,30 @@ void lpPeriodicBackup::backupNow()
 
 }
 
+void lpPeriodicBackup::onProcessFinished(int exitCode, QProcess::ExitStatus exitStatus)
+{
+	if (exitStatus == QProcess::NormalExit && exitCode == 0)
+	{
+		qDebug() << "zip successfully!!" << __FUNCTION__;
+		// 压缩成功后删除临时备份文件夹
+		if (!m_currentBackupFolderPath.isEmpty())
+		{
+			QDir(m_currentBackupFolderPath).removeRecursively();
+			qDebug() << "Temporary backup folder deleted:" << m_currentBackupFolderPath << __FUNCTION__;
+			m_currentBackupFolderPath.clear(); // 清空当前备份文件夹路径
+		}
+	}
+	else
+	{
+		qDebug() << "Failed to execute zip command";
+		qDebug() << "Error output: " << m_process->errorString();
+	}
+}
+
 void lpPeriodicBackup::loadConfig()
 {
-	QFile configFile("backup_config.json");
-
+	QString configFilePath = qApp->applicationDirPath() + "/lpIPUConfig/backup_config.json";
+	QFile configFile(configFilePath);
 	if (configFile.open(QIODevice::ReadOnly))
 	{
 		QByteArray configData = configFile.readAll();
@@ -76,10 +107,16 @@ void lpPeriodicBackup::loadConfig()
 		QJsonObject configObj = configDoc.object();
 
 		QStringList relativePaths = configObj["important_paths"].toVariant().toStringList();
+		QSet<QString>uniquePaths;
 		foreach(const QString &relativePath, relativePaths)
 		{
 			QString absolutePath = qApp->applicationDirPath()+ relativePath;
-			m_importantPaths.append(absolutePath);
+			if (!uniquePaths.contains(absolutePath))
+			{
+				uniquePaths.insert(absolutePath);
+				m_importantPaths.append(absolutePath);
+			}
+			
 		}
 		m_backupIntervalHours = configObj["backup_interval_hours"].toInt();
 		m_backupOnStartup = configObj["backup_on_startup"].toBool();
@@ -198,24 +235,29 @@ bool lpPeriodicBackup::createBackup(const QString &backupPath)
 
 bool lpPeriodicBackup::compressDirectory(const QString &directoryPath, const QString &zipFilePath)
 { 
-	 QString command = QString("powershell Compress-Archive -Path '%1' -DestinationPath '%2'").arg(directoryPath, zipFilePath);
-	QProcess process;
-	process.start(command);
-	if (!process.waitForFinished())
+	// 确保在启动新命令前停止当前运行的进程
+	if (m_process->state() == QProcess::Running)
 	{
-		qDebug() << "zip failed!!" << process.errorString() << __FUNCTION__;
+		m_process->kill();
+		m_process->waitForFinished();
 	}
-	else
+	// 检查目录是否存在
+	if (!QDir(directoryPath).exists())
 	{
-		qDebug() << "zip sucessfully!!" << __FUNCTION__;
-	}
-	
-	int exitCode = process.exitCode();
-	if (exitCode != 0)
-	{
-		qDebug() << "Failed to execute zip command: " << command;
+		qDebug() << "Directory does not exist:" << directoryPath << __FUNCTION__;
 		return false;
 	}
+	// 构建7z命令
+	QString command = QString("7z a \"%1\" \"%2\"").arg(zipFilePath, directoryPath);
+	m_process->start(command);
+	// 异步处理，立即返回 true 表示命令已经开始执行
+	if (!m_process->waitForStarted())
+	{
+		qDebug() << "Failed to start process:" << m_process->errorString() << __FUNCTION__;
+		return false;
+	}
+
+	qDebug() << "Compression process started:" << command << __FUNCTION__;
 	return true;
 }
 

@@ -10,6 +10,7 @@ copyright:杭州利珀科技有限公司
 
 #include "lpperiodicbackup_global.h"
 #include <QTimer>
+#include <QProcess>
 class  lpPeriodicBackup :public lpPeriodicBackupBase
 {
 	Q_OBJECT
@@ -19,7 +20,8 @@ public:
 
 	void startBackup()override;
 	void backupNow()override;
-
+private slots:
+	void onProcessFinished(int exitCode, QProcess::ExitStatus exitStatus);
 private:
 	void loadConfig();
 	bool copyRecursively(const QString &srcPath, const QString &dstPath);
@@ -33,4 +35,6 @@ private:
 	int				m_backupIntervalHours;
 	bool			m_backupOnStartup;
 	QString			m_backupBasePath;
+	QProcess*		m_process;
+	QString         m_currentBackupFolderPath;
 };

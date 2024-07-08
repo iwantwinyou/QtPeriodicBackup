@@ -16,7 +16,8 @@
 	m_periodic_backup_ptr = lpCreatePeriodicBackup();
 	if (m_periodic_backup_ptr)
 	{
-		m_periodic_backup_ptr->startBackup();
+		m_periodic_backup_ptr->init();
+		m_periodic_backup_ptr->thrdStart();
 	}
 }
 
@@ -28,3 +29,11 @@ V1.0.0.1 2024-06-20
 >支持定期备份，时间间隔单位：小时
 >备份文件夹路径：x64/backup，文件夹名称为时间，压缩成.zip文件
 >备份的关键信息文件夹内的图片文件会删除，不会备份到备份文件夹内
+
+V1.0.0.2 2024-07-05
+>版本2
+>增加第三方库7z.dll跟7z.exe,利用第三方工具压缩文件夹
+
+V1.0.0.2 2024-07-08
+>内部线程化 避免阻塞主线程
+>添加接口

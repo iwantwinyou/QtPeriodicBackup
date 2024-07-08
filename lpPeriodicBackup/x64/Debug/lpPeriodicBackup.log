@@ -1,2 +1,6 @@
-﻿  lpPeriodicBackup.cpp
+﻿  Moc'ing lpPeriodicBackup.h...
+  Moc'ing lpperiodicbackup_global.h...
+  moc_lpPeriodicBackup.cpp
+  moc_lpperiodicbackup_global.cpp
+  lpPeriodicBackup.cpp
   lpPeriodicBackup.vcxproj -> E:\Git_ipu\soft_dev\tpvs17\..\runner17\x64\lpPeriodicBackupd.dll

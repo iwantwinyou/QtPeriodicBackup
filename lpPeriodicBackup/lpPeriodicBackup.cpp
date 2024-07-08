@@ -22,17 +22,14 @@ QSharedPointer<lpPeriodicBackupBase>lpCreatePeriodicBackup()
 lpPeriodicBackup::lpPeriodicBackup(QObject *parent)
 	:lpPeriodicBackupBase(parent)
 {
-	loadConfig();
-	m_backupTimer = new QTimer(this);
-	connect(m_backupTimer, &QTimer::timeout, this, &lpPeriodicBackup::backupNow);
-	m_process = new QProcess(this);
-	connect(m_process, QOverload<int, QProcess::ExitStatus>::of(&QProcess::finished),
-		this, &lpPeriodicBackup::onProcessFinished);
+	//init();
+	//内部线程化
+	//thrdStart();
 }
 
 lpPeriodicBackup::~lpPeriodicBackup()
 {
-
+	thrdStop();
 }
 
 void lpPeriodicBackup::startBackup()
@@ -45,12 +42,17 @@ void lpPeriodicBackup::startBackup()
 	{
 		backupNow();
 	}
-	m_backupTimer->start(m_backupIntervalHours*1000*60*60);
+	m_backupTimer->start(m_backupIntervalHours*1000*60);
 	qDebug() << "backupOnStartup:  "<<m_backupOnStartup << " backupIntervalHours: "<<m_backupIntervalHours << __FUNCTION__;
 }
 
 void lpPeriodicBackup::backupNow()
 {
+	if (QThread::currentThread() != m_this_thread_ptr)
+	{
+		QMetaObject::invokeMethod(this, "backupNow", Qt::QueuedConnection);
+		return;
+	}
 	QString timeTemp = QDateTime::currentDateTime().toString("yyyyMMdd_hhmmss");
 	QString backupFolderPath = m_backupBasePath + "/" + timeTemp;
 	QString zipFilePath = m_backupBasePath + "/" + timeTemp + ".zip";
@@ -74,6 +76,38 @@ void lpPeriodicBackup::backupNow()
 		qDebug() << "Backup creation failed!! --backupFolderPath:" << backupFolderPath << __FUNCTION__;
 	}
 
+}
+
+void lpPeriodicBackup::thrdStart()
+{
+	if (!m_this_thread_ptr)
+	{
+		m_this_thread_ptr = new QThread;
+		this->moveToThread(m_this_thread_ptr);
+	}
+	connect(m_this_thread_ptr, &QThread::started, this, &lpPeriodicBackup::startBackup);
+	connect(m_this_thread_ptr, &QThread::finished, m_this_thread_ptr, &QThread::deleteLater);
+	m_this_thread_ptr->start();
+}
+
+void lpPeriodicBackup::thrdStop()
+{
+	if (m_this_thread_ptr)
+	{
+		m_this_thread_ptr->quit();
+		m_this_thread_ptr->deleteLater();
+		m_this_thread_ptr = nullptr;
+	}
+}
+
+void lpPeriodicBackup::init()
+{
+	loadConfig();
+	m_backupTimer = new QTimer(this);
+	connect(m_backupTimer, &QTimer::timeout, this, &lpPeriodicBackup::backupNow);
+	m_process = new QProcess(this);
+	connect(m_process, QOverload<int, QProcess::ExitStatus>::of(&QProcess::finished),
+		this, &lpPeriodicBackup::onProcessFinished);
 }
 
 void lpPeriodicBackup::onProcessFinished(int exitCode, QProcess::ExitStatus exitStatus)

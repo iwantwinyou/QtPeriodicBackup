@@ -20,7 +20,8 @@ public:
 	lpPeriodicBackupBase(QObject *parent = nullptr) :QObject(parent) {}
 	virtual ~lpPeriodicBackupBase() {}
 
-	virtual void startBackup() = 0;
-	virtual void backupNow() = 0;
+	virtual void init() = 0;
+	virtual void thrdStart() = 0;
+	virtual void thrdStop() = 0;
 };
 LPPERIODICBACKUP_EXPORT QSharedPointer<lpPeriodicBackupBase> lpCreatePeriodicBackup();

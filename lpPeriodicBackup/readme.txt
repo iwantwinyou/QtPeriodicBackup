@@ -14,11 +14,6 @@
 
 {
 	m_periodic_backup_ptr = lpCreatePeriodicBackup();
-	if (m_periodic_backup_ptr)
-	{
-		m_periodic_backup_ptr->init();
-		m_periodic_backup_ptr->thrdStart();
-	}
 }
 
 
@@ -34,6 +29,11 @@ V1.0.0.2 2024-07-05
 >版本2
 >增加第三方库7z.dll跟7z.exe,利用第三方工具压缩文件夹
 
-V1.0.0.2 2024-07-08
+V1.0.0.3 2024-07-08
 >内部线程化 避免阻塞主线程
 >添加接口
+
+V1.0.0.4 2024-07-09
+>接口调整
+
+

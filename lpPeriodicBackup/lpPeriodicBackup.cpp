@@ -22,9 +22,7 @@ QSharedPointer<lpPeriodicBackupBase>lpCreatePeriodicBackup()
 lpPeriodicBackup::lpPeriodicBackup(QObject *parent)
 	:lpPeriodicBackupBase(parent)
 {
-	//init();
-	//内部线程化
-	//thrdStart();
+	initBackup();
 }
 
 lpPeriodicBackup::~lpPeriodicBackup()
@@ -42,7 +40,7 @@ void lpPeriodicBackup::startBackup()
 	{
 		backupNow();
 	}
-	m_backupTimer->start(m_backupIntervalHours*1000*60);
+	m_backupTimer->start(m_backupIntervalHours*1000*60*60);
 	qDebug() << "backupOnStartup:  "<<m_backupOnStartup << " backupIntervalHours: "<<m_backupIntervalHours << __FUNCTION__;
 }
 
@@ -76,6 +74,12 @@ void lpPeriodicBackup::backupNow()
 		qDebug() << "Backup creation failed!! --backupFolderPath:" << backupFolderPath << __FUNCTION__;
 	}
 
+}
+
+void lpPeriodicBackup::initBackup()
+{
+	init();
+	thrdStart();
 }
 
 void lpPeriodicBackup::thrdStart()

@@ -1,9 +1,9 @@
 /*
 file:lpPeriodicBackup.h
 date:2024/6/17
-brief:定期备份关键信息模块
+brief:瀹氭湡澶囦唤鍏抽敭淇℃伅妯″潡
 author:wuchaoxi
-copyright:杭州利珀科技有限公司
+copyright:
 */
 
 #pragma once
@@ -27,7 +27,7 @@ private:
 	bool copyRecursively(const QString &srcPath, const QString &dstPath);
 	bool createBackup(const QString &backupPath);
 	bool compressDirectory(const QString &directoryPath, const QString &zipFilePath);
-	//移除图片
+	//绉婚櫎鍥剧墖
 	bool removeImagesFromDir(const QString &backupPath);
 	void startBackup();
 	void thrdStart();

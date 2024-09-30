@@ -1,4 +1,4 @@
-#include "lpPeriodicBackup.h"
+Ôªø#include "lpPeriodicBackup.h"
 #include <QFile>
 #include <QJsonDocument>
 #include<QJsonObject>
@@ -23,29 +23,30 @@ lpPeriodicBackup::lpPeriodicBackup(QObject *parent)
 	:lpPeriodicBackupBase(parent)
 {
 	initBackup();
+	connect(this, &lpPeriodicBackup::sgStopTimer, this, &lpPeriodicBackup::onStopTimer,Qt::BlockingQueuedConnection);
 }
 
 lpPeriodicBackup::~lpPeriodicBackup()
 {
+	qDebug() << __FUNCTION__;
+	emit sgStopTimer();
 	thrdStop();
 }
 
 void lpPeriodicBackup::startBackup()
 {
 	qDebug() << "startBackup:" << __FUNCTION__;
-	//»Áπ˚ƒø±ÍŒƒº˛º–Œ™ø’‘Ú≤ª–Ë“™±∏∑›
-	if (m_importantPaths.isEmpty())
+	//Â¶ÇÊûúÁõÆÊ†áÊñá‰ª∂Â§π‰∏∫Á©∫Âàô‰∏çÈúÄË¶ÅÂ§á‰ªΩ
+	if (m_importantPaths.isEmpty() || !m_backupOnStartup || m_backupIntervalHours<1)
 		return;
-	if (m_backupOnStartup)
-	{
-		backupNow();
-	}
+	
+	backupNow();
 	m_backupTimer->start(m_backupIntervalHours*1000*60*60);
 	qDebug() << "backupOnStartup:  "<<m_backupOnStartup << " backupIntervalHours: "<<m_backupIntervalHours << __FUNCTION__;
 }
 
 void lpPeriodicBackup::backupNow()
-{
+{// ÊâßË°å‰∏ÄÊ¨°Â§á‰ªΩ
 	if (QThread::currentThread() != m_this_thread_ptr)
 	{
 		QMetaObject::invokeMethod(this, "backupNow", Qt::QueuedConnection);
@@ -59,19 +60,19 @@ void lpPeriodicBackup::backupNow()
 		if (compressDirectory(backupFolderPath, zipFilePath))
 		{
 			qDebug() << "Backup and compression successful!! --zipFilePath:" << zipFilePath << __FUNCTION__;
-			// …æ≥˝¡Ÿ ±±∏∑›Œƒº˛º–
-			m_currentBackupFolderPath = backupFolderPath; // ±£¥Êµ±«∞±∏∑›Œƒº˛º–¬∑æ∂
+			// Âà†Èô§‰∏¥Êó∂Â§á‰ªΩÊñá‰ª∂Â§π
+			m_currentBackupFolderPath = backupFolderPath; // ‰øùÂ≠òÂΩìÂâçÂ§á‰ªΩÊñá‰ª∂Â§πË∑ØÂæÑ
 		}
 		else
 		{
-			qDebug() << "Compression failed!! --backupFolderPath:" << backupFolderPath << __FUNCTION__;
-			// »Áπ˚—πÀı ß∞‹£¨ø…“‘—°‘Ò…æ≥˝¡Ÿ ±±∏∑›Œƒº˛º–
+			qWarning() << "Compression failed!! --backupFolderPath:" << backupFolderPath << __FUNCTION__;
+			// Â¶ÇÊûúÂéãÁº©Â§±Ë¥•ÔºåÂèØ‰ª•ÈÄâÊã©Âà†Èô§‰∏¥Êó∂Â§á‰ªΩÊñá‰ª∂Â§π
 			QDir(backupFolderPath).removeRecursively();
 		}
 	}
 	else
 	{
-		qDebug() << "Backup creation failed!! --backupFolderPath:" << backupFolderPath << __FUNCTION__;
+		qWarning() << "Backup creation failed!! --backupFolderPath:" << backupFolderPath << __FUNCTION__;
 	}
 
 }
@@ -119,19 +120,25 @@ void lpPeriodicBackup::onProcessFinished(int exitCode, QProcess::ExitStatus exit
 	if (exitStatus == QProcess::NormalExit && exitCode == 0)
 	{
 		qDebug() << "zip successfully!!" << __FUNCTION__;
-		// —πÀı≥…π¶∫Û…æ≥˝¡Ÿ ±±∏∑›Œƒº˛º–
+		// ÂéãÁº©ÊàêÂäüÂêéÂà†Èô§‰∏¥Êó∂Â§á‰ªΩÊñá‰ª∂Â§π
 		if (!m_currentBackupFolderPath.isEmpty())
 		{
 			QDir(m_currentBackupFolderPath).removeRecursively();
 			qDebug() << "Temporary backup folder deleted:" << m_currentBackupFolderPath << __FUNCTION__;
-			m_currentBackupFolderPath.clear(); // «Âø’µ±«∞±∏∑›Œƒº˛º–¬∑æ∂
+			m_currentBackupFolderPath.clear(); // Ê∏ÖÁ©∫ÂΩìÂâçÂ§á‰ªΩÊñá‰ª∂Â§πË∑ØÂæÑ
 		}
 	}
 	else
 	{
-		qDebug() << "Failed to execute zip command";
-		qDebug() << "Error output: " << m_process->errorString();
+		qWarning() << "Failed to execute zip command";
+		qWarning() << "Error output: " << m_process->errorString();
 	}
+}
+
+void lpPeriodicBackup::onStopTimer()
+{
+	qDebug() << __FUNCTION__;
+	m_backupTimer->stop();
 }
 
 void lpPeriodicBackup::loadConfig()
@@ -144,22 +151,21 @@ void lpPeriodicBackup::loadConfig()
 		QJsonDocument configDoc = QJsonDocument::fromJson(configData);
 		QJsonObject configObj = configDoc.object();
 
-		QStringList relativePaths = configObj["important_paths"].toVariant().toStringList();
+		QStringList relativePaths = configObj.value("important_paths").toVariant().toStringList();
 		QSet<QString>uniquePaths;
 		foreach(const QString &relativePath, relativePaths)
 		{
-			QString absolutePath = qApp->applicationDirPath()+ relativePath;
+			QString absolutePath = qApp->applicationDirPath()+"/"+ relativePath;
 			if (!uniquePaths.contains(absolutePath))
 			{
 				uniquePaths.insert(absolutePath);
 				m_importantPaths.append(absolutePath);
 			}
-			
 		}
-		m_backupIntervalHours = configObj["backup_interval_hours"].toInt();
-		m_backupOnStartup = configObj["backup_on_startup"].toBool();
-		QString backupBasePath = configObj["backup_path"].toString();
-		m_backupBasePath = qApp->applicationDirPath()+backupBasePath;
+		m_backupIntervalHours = configObj.value("backup_interval_hours").toInt(1);
+		m_backupOnStartup = configObj.value("enable").toBool(false);
+		QString backupBasePath = configObj.value("backup_path").toString("backup");
+		m_backupBasePath = qApp->applicationDirPath()+"/"+backupBasePath;
 	}
 }
 
@@ -199,13 +205,13 @@ bool lpPeriodicBackup::copyRecursively(const QString &srcPath, const QString &ds
 
 bool lpPeriodicBackup::createBackup(const QString &backupPath)
 {
-	// »∑±£±∏∑›¬∑æ∂¥Ê‘⁄
+	// Á°Æ‰øùÂ§á‰ªΩË∑ØÂæÑÂ≠òÂú®
 	QDir backDir(QDir::cleanPath(m_backupBasePath));
 	if (!backDir.exists())
 	{
 		if (!backDir.mkdir("."))
 		{
-			qDebug() << "Failed to create base backup directory:" << m_backupBasePath<<__FUNCTION__;
+			qWarning() << "Failed to create base backup directory:" << m_backupBasePath<<__FUNCTION__;
 			return false;
 		}
 	}
@@ -213,20 +219,20 @@ bool lpPeriodicBackup::createBackup(const QString &backupPath)
 	QString backupFolderPath = QDir::cleanPath(m_backupBasePath + "/" + QDateTime::currentDateTime().toString("yyyyMMdd_hhmmss"));
 	if (!QDir().mkdir(backupFolderPath))
 	{
-		qDebug() << "Failed to create backup folder:" << backupFolderPath<<__FUNCTION__;
+		qWarning() << "Failed to create backup folder:" << backupFolderPath<<__FUNCTION__;
 		return false;
 	}
-	// ∏¥÷∆À˘”–÷ÿ“™¬∑æ∂µΩ¡Ÿ ±±∏∑›Œƒº˛º–
+	// Â§çÂà∂ÊâÄÊúâÈáçË¶ÅË∑ØÂæÑÂà∞‰∏¥Êó∂Â§á‰ªΩÊñá‰ª∂Â§π
 	for (const auto& path : m_importantPaths)
 	{
 		QFileInfo fileInfo(path);
-		QString targetPath = backupFolderPath + "/" + fileInfo.fileName(); //  π”√ fileName ªÒ»°Œƒº˛√˚ªÚŒƒº˛º–√˚
+		QString targetPath = backupFolderPath + "/" + fileInfo.fileName(); // ‰ΩøÁî® fileName Ëé∑ÂèñÊñá‰ª∂ÂêçÊàñÊñá‰ª∂Â§πÂêç
 
 		if (fileInfo.isDir())
 		{
 			if (!QDir().mkpath(targetPath))
 			{
-				qDebug() << "Failed to create target directory:" << targetPath<<__FUNCTION__;
+				qWarning() << "Failed to create target directory:" << targetPath<<__FUNCTION__;
 				return false;
 			}
 			QDir dir(path);
@@ -238,7 +244,7 @@ bool lpPeriodicBackup::createBackup(const QString &backupPath)
 				{
 					if (!QDir().mkpath(destFilePath) || !copyRecursively(srcFilePath, destFilePath))
 					{
-						qDebug() << "Failed to copy directory:" << srcFilePath<<__FUNCTION__;
+						qWarning() << "Failed to copy directory:" << srcFilePath<<__FUNCTION__;
 						return false;
 					}
 				}
@@ -246,7 +252,7 @@ bool lpPeriodicBackup::createBackup(const QString &backupPath)
 				{
 					if (!QFile::copy(srcFilePath, destFilePath))
 					{
-						qDebug() << "Failed to copy file:" << srcFilePath<<__FUNCTION__;
+						qWarning() << "Failed to copy file:" << srcFilePath<<__FUNCTION__;
 						return false;
 					}
 				}
@@ -256,16 +262,16 @@ bool lpPeriodicBackup::createBackup(const QString &backupPath)
 		{
 			if (!QFile::copy(path, targetPath))
 			{
-				qDebug() << "Failed to copy file:" << path<<__FUNCTION__;
+				qWarning() << "Failed to copy file:" << path<<__FUNCTION__;
 				return false;
 			}
 		}
 	}
 
-	// µ›πÈ…æ≥˝±∏∑›¬∑æ∂÷–µƒÕº∆¨Œƒº˛
+	// ÈÄíÂΩíÂà†Èô§Â§á‰ªΩË∑ØÂæÑ‰∏≠ÁöÑÂõæÁâáÊñá‰ª∂
 	if (!removeImagesFromDir(backupFolderPath))
 	{
-		qDebug() << "Failed to remove images from backup folder:" << backupFolderPath << __FUNCTION__;
+		qWarning() << "Failed to remove images from backup folder:" << backupFolderPath << __FUNCTION__;
 		return false;
 	}
 	return true;
@@ -273,25 +279,25 @@ bool lpPeriodicBackup::createBackup(const QString &backupPath)
 
 bool lpPeriodicBackup::compressDirectory(const QString &directoryPath, const QString &zipFilePath)
 { 
-	// »∑±£‘⁄∆Ù∂Ø–¬√¸¡Ó«∞Õ£÷πµ±«∞‘À––µƒΩ¯≥Ã
+	// Á°Æ‰øùÂú®ÂêØÂä®Êñ∞ÂëΩ‰ª§ÂâçÂÅúÊ≠¢ÂΩìÂâçËøêË°åÁöÑËøõÁ®ã
 	if (m_process->state() == QProcess::Running)
 	{
 		m_process->kill();
 		m_process->waitForFinished();
 	}
-	// ºÏ≤Èƒø¬º «∑Ò¥Ê‘⁄
+	// Ê£ÄÊü•ÁõÆÂΩïÊòØÂê¶Â≠òÂú®
 	if (!QDir(directoryPath).exists())
 	{
-		qDebug() << "Directory does not exist:" << directoryPath << __FUNCTION__;
+		qWarning() << "Directory does not exist:" << directoryPath << __FUNCTION__;
 		return false;
 	}
-	// ππΩ®7z√¸¡Ó
+	// ÊûÑÂª∫7zÂëΩ‰ª§
 	QString command = QString("7z a \"%1\" \"%2\"").arg(zipFilePath, directoryPath);
 	m_process->start(command);
-	// “Ï≤Ω¥¶¿Ì£¨¡¢º¥∑µªÿ true ±Ì æ√¸¡Ó“—æ≠ø™ º÷¥––
+	// ÂºÇÊ≠•Â§ÑÁêÜÔºåÁ´ãÂç≥ËøîÂõû true Ë°®Á§∫ÂëΩ‰ª§Â∑≤ÁªèÂºÄÂßãÊâßË°å
 	if (!m_process->waitForStarted())
 	{
-		qDebug() << "Failed to start process:" << m_process->errorString() << __FUNCTION__;
+		qWarning() << "Failed to start process:" << m_process->errorString() << __FUNCTION__;
 		return false;
 	}
 
@@ -304,9 +310,11 @@ bool lpPeriodicBackup::removeImagesFromDir(const QString &backupPath)
 	QDir dir(backupPath);
 	if (!dir.exists())
 	{
-		qDebug() << "Directory does not exist:" << backupPath << __FUNCTION__;
+		qWarning() << "Directory does not exist:" << backupPath << __FUNCTION__;
 		return false;
 	}
+	if (backupPath.contains("ui/skin/"))
+		return true; // ÁöÆËÇ§ÂõæÊ†áÊó†ÈúÄÂà†Èô§
 
 	QStringList imageExtensions = QStringList() << "jpg" << "jpeg" << "png" << "gif"<<"bmp";
 	QFileInfoList list = dir.entryInfoList(QDir::NoDotAndDotDot | QDir::AllEntries);
@@ -317,10 +325,10 @@ bool lpPeriodicBackup::removeImagesFromDir(const QString &backupPath)
 	{
 		if (fileInfo.isDir())
 		{
-			// µ›πÈ…æ≥˝◊”ƒø¬º÷–µƒÕº∆¨Œƒº˛
+			// ÈÄíÂΩíÂà†Èô§Â≠êÁõÆÂΩï‰∏≠ÁöÑÂõæÁâáÊñá‰ª∂
 			if (!removeImagesFromDir(fileInfo.absoluteFilePath()))
 			{
-				qDebug() << "Failed to remove images from directory:" << fileInfo.absoluteFilePath() << __FUNCTION__;
+				qWarning() << "Failed to remove images from directory:" << fileInfo.absoluteFilePath() << __FUNCTION__;
 				return false;
 			}
 		}
@@ -334,7 +342,7 @@ bool lpPeriodicBackup::removeImagesFromDir(const QString &backupPath)
 			}
 			else
 			{
-				qDebug() << "Failed to delete:" << filePath << __FUNCTION__;
+				qWarning() << "Failed to delete:" << filePath << __FUNCTION__;
 			}
 		}
 	}

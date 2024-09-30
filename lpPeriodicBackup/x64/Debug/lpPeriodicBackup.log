@@ -1,6 +1,7 @@
 ﻿  Moc'ing lpPeriodicBackup.h...
   Moc'ing lpperiodicbackup_global.h...
+  lpPeriodicBackup.cpp
   moc_lpPeriodicBackup.cpp
   moc_lpperiodicbackup_global.cpp
-  lpPeriodicBackup.cpp
+    正在创建库 E:\Git_ipu\soft_dev\tpvs17\..\runner17\x64\lpPeriodicBackupd.lib 和对象 E:\Git_ipu\soft_dev\tpvs17\..\runner17\x64\lpPeriodicBackupd.exp
   lpPeriodicBackup.vcxproj -> E:\Git_ipu\soft_dev\tpvs17\..\runner17\x64\lpPeriodicBackupd.dll

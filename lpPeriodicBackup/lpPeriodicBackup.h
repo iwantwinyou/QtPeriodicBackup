@@ -1,7 +1,7 @@
 /*
 file:lpPeriodicBackup.h
 date:2024/6/17
-brief:瀹氭湡澶囦唤鍏抽敭淇℃伅妯″潡
+brief:定期备份关键信息模块
 author:wuchaoxi
 copyright:
 */
@@ -18,16 +18,20 @@ class  lpPeriodicBackup :public lpPeriodicBackupBase
 public:
 	explicit lpPeriodicBackup(QObject *parent = nullptr);
 	virtual ~lpPeriodicBackup();
-private slots:
-	void onProcessFinished(int exitCode, QProcess::ExitStatus exitStatus);
-private:
-	void loadConfig();
+
 	void backupNow()override;
 	void initBackup()override;
+signals:
+	void sgStopTimer();
+private slots:
+	void onProcessFinished(int exitCode, QProcess::ExitStatus exitStatus);
+	void onStopTimer();
+private:
+	void loadConfig();
 	bool copyRecursively(const QString &srcPath, const QString &dstPath);
 	bool createBackup(const QString &backupPath);
 	bool compressDirectory(const QString &directoryPath, const QString &zipFilePath);
-	//绉婚櫎鍥剧墖
+	//移除图片
 	bool removeImagesFromDir(const QString &backupPath);
 	void startBackup();
 	void thrdStart();
@@ -35,7 +39,7 @@ private:
 	void init();
 
 private:
-	QTimer*			m_backupTimer;
+	QTimer*			m_backupTimer; 
 	QStringList		m_importantPaths;
 	int				m_backupIntervalHours;
 	bool			m_backupOnStartup;
